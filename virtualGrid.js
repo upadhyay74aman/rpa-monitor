@@ -102,15 +102,19 @@
 
         if (column.isStatus) {
           cell.textContent = raw;
+          cell.title = raw;
           cell.className = "c " + column.cls + " c-status status-" + raw;
         } else if (column.isRoi) {
           cell.textContent = formatters.fmtRoi(raw);
+          cell.title = formatters.fmtRoi(raw);
           cell.className = "c " + column.cls + " " + (raw < 0 ? "roi-neg" : "roi-pos");
         } else if (column.fmt) {
           cell.textContent = formatters[column.fmt](raw);
+          cell.title = formatters[column.fmt](raw);
           cell.className = "c " + column.cls;
         } else {
           cell.textContent = raw;
+          cell.title = raw;
           cell.className = "c " + column.cls;
         }
       }
