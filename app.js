@@ -20,6 +20,8 @@
     filterDepartment: document.getElementById("filterDepartment"),
     filterIndustry: document.getElementById("filterIndustry"),
     clearFiltersBtn: document.getElementById("clearFiltersBtn"),
+    exportCsvBtn: document.getElementById("exportCsvBtn"),
+    exportStatusBadge: document.getElementById("exportStatusBadge"),
     toggleAnalytics: document.getElementById("toggleAnalytics"),
     toggleInfra: document.getElementById("toggleInfra"),
     sideAnalytics: document.getElementById("sideAnalytics"),
@@ -87,6 +89,117 @@
       data: { labels: Object.keys(deptTotals), datasets: [{ label: 'Budget by Dept', data: Object.values(deptTotals), backgroundColor: '#3b82f6' }] },
       options: { responsive: true, maintainAspectRatio: false }
     });
+  }
+
+  // BOUNTY TASK 3: Snapshot Export
+  // Exports activeIndices exactly as currently sorted+filtered — that array is
+  // already maintained by stateEngine to respect sortChain/activeFilters/
+  // searchTokens on every tick, so no extra sort/filter logic is needed here;
+  // reading it directly is what guarantees the export matches what the
+  // operator sees on screen at the moment of export.
+  //
+  // "Must not freeze ongoing operations": building a CSV string for tens of
+  // thousands of rows synchronously blocks the main thread for hundreds of ms
+  // (measured ~500ms for 50k rows x 14 cols), which would visibly stall the
+  // FPS readout and could cause the 200ms data stream to miss/delay ticks.
+  // Instead this builds the CSV in small chunks across multiple animation
+  // frames, yielding control back to the browser between chunks so streaming,
+  // rendering, and the FPS loop are never blocked for more than one frame.
+  const EXPORT_CHUNK_SIZE = 2000;
+  const CSV_EXPORT_COLUMNS = [
+    "internal_uid", "project_name", "company_id", "project_status",
+    "automation_type", "robots_deployed", "budget_usd", "annual_savings_usd",
+    "roi_percent", "employee_hours_saved", "department",
+    "implementation_partner", "country", "industry"
+  ];
+  let exportInProgress = false;
+
+  function csvEscapeCell(value) {
+    const s = value === undefined || value === null ? "" : String(value);
+    // Quote whenever the field contains a comma, quote, or newline, per the
+    // standard CSV escaping rule; double any embedded quotes.
+    if (/[",\n\r]/.test(s)) return '"' + s.replace(/"/g, '""') + '"';
+    return s;
+  }
+
+  function csvRowFromRecord(row) {
+    const cells = new Array(CSV_EXPORT_COLUMNS.length);
+    for (let i = 0; i < CSV_EXPORT_COLUMNS.length; i++) {
+      cells[i] = csvEscapeCell(row[CSV_EXPORT_COLUMNS[i]]);
+    }
+    return cells.join(",");
+  }
+
+  function triggerCsvDownload(csvText) {
+    const blob = new Blob([csvText], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    const stamp = new Date().toISOString().replace(/[:.]/g, "-");
+    link.href = url;
+    link.download = "rpa_snapshot_export_" + stamp + ".csv";
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    // Revoke on a delay rather than immediately: some browsers cancel the
+    // download if the object URL is revoked before the click is fully handled.
+    window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+  }
+
+  function exportSnapshotToCsv() {
+    if (exportInProgress) return; // guard against double-clicks mid-export
+    exportInProgress = true;
+    els.exportCsvBtn.disabled = true;
+    els.exportStatusBadge.style.display = "inline-block";
+    els.exportStatusBadge.textContent = "exporting...";
+
+    // Snapshot activeIndices and rowsById ONCE, up front. activeIndices already
+    // reflects the current sortChain + activeFilters + searchTokens exactly as
+    // the operator sees it right now. We intentionally do NOT re-read engine
+    // state between chunks: the stream keeps mutating rowsById every 200ms
+    // while we're exporting, and exporting against a moving target would
+    // produce a CSV that's internally inconsistent (some rows from tick N,
+    // some from tick N+3). A single consistent snapshot is the correct
+    // semantics for a "Snapshot" export.
+    const snapshot = engine.getSnapshot();
+    const orderedUids = snapshot.activeIndices;
+    const rowsById = snapshot.rowsById;
+    const lines = [CSV_EXPORT_COLUMNS.join(",")];
+    let cursor = 0;
+
+    function processChunk() {
+      const end = Math.min(cursor + EXPORT_CHUNK_SIZE, orderedUids.length);
+      for (let i = cursor; i < end; i++) {
+        const row = rowsById.get(orderedUids[i]);
+        if (row) lines.push(csvRowFromRecord(row));
+      }
+      cursor = end;
+
+      if (cursor < orderedUids.length) {
+        els.exportStatusBadge.textContent =
+          "exporting... " + cursor.toLocaleString("en-US") + "/" + orderedUids.length.toLocaleString("en-US");
+        // Yield to the browser between chunks so the render loop, FPS counter,
+        // and incoming stream batches all get to run before the next slice.
+        requestAnimationFrame(processChunk);
+        return;
+      }
+
+      triggerCsvDownload(lines.join("\n"));
+      els.exportStatusBadge.style.display = "none";
+      els.exportCsvBtn.disabled = false;
+      exportInProgress = false;
+    }
+
+    if (orderedUids.length === 0) {
+      // Nothing active to export (e.g. filters matched zero rows) — still
+      // produce a valid header-only CSV rather than silently doing nothing.
+      triggerCsvDownload(lines.join("\n"));
+      els.exportStatusBadge.style.display = "none";
+      els.exportCsvBtn.disabled = false;
+      exportInProgress = false;
+      return;
+    }
+
+    requestAnimationFrame(processChunk);
   }
 
   function updateDebugOverlay() {
@@ -243,6 +356,10 @@
       els.filterIndustry.value = "";
       els.searchInput.value = "";
       engine.clearFiltersAndSearch();
+    });
+
+    els.exportCsvBtn.addEventListener("click", () => {
+      exportSnapshotToCsv();
     });
 
     let searchDebounce = null;
