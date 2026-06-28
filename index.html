@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>High-Density Enterprise RPA Monitor</title>
+  <link rel="stylesheet" href="./styles.css">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+  <header class="topbar">
+    <div>
+      <h1>HIGH-DENSITY ENTERPRISE RPA MONITOR</h1>
+      <div class="meta">Worldwide RPA Database 2026 - Client-side telemetry orchestration</div>
+    </div>
+    <div class="perf-readout" aria-label="Performance readouts">
+      <span>FPS <b id="fpsReadout">--</b></span>
+      <span>Active rows <b id="activeRowsReadout">0</b></span>
+      <span>DOM nodes <b id="domNodesReadout">0</b></span>
+    </div>
+  </header>
+
+  <section class="kpis" aria-label="Live KPI summary">
+    <article class="kpi">
+      <div class="lbl">Total Streamed Rows Processed</div>
+      <div class="val" id="kpiStreamed">0</div>
+    </article>
+    <article class="kpi">
+      <div class="lbl">Active Robots Deployed (running sum)</div>
+      <div class="val" id="kpiRobots">0</div>
+    </article>
+    <article class="kpi">
+      <div class="lbl">Global Cumulative Savings (running sum)</div>
+      <div class="val" id="kpiSavings">$0</div>
+    </article>
+  </section>
+
+  <nav class="toolbar" aria-label="Grid controls">
+    <button id="pauseBtn" class="primary" type="button">Pause</button>
+    <button id="analyticsBtn" type="button" style="display: none; border-color: #f59e0b; color: #f59e0b;">Analytics View</button>
+    <span class="badge" id="bufferBadge">buffer: 0</span>
+
+    <input type="text" id="searchInput" placeholder="Fuzzy search: name, company, partner, country" autocomplete="off">
+
+    <select id="filterAutomationType" aria-label="Automation type filter"><option value="">All automation types</option></select>
+    <select id="filterDepartment" aria-label="Department filter"><option value="">All departments</option></select>
+    <select id="filterIndustry" aria-label="Industry filter"><option value="">All industries</option></select>
+
+    <button id="clearFiltersBtn" type="button">Clear filters</button>
+    <div class="spacer-flex"></div>
+
+    <div class="panel-toggles">
+      <label><input type="checkbox" id="toggleAnalytics" checked> Department panel</label>
+      <label><input type="checkbox" id="toggleInfra" checked> KPIs / Infra</label>
+    </div>
+  </nav>
+
+  <main class="layout">
+    <aside id="sideAnalytics" aria-label="Department analytics">
+      <h2>Department Analytics (live)</h2>
+      <div id="deptList"></div>
+    </aside>
+
+    <section class="grid-area" aria-label="RPA telemetry grid">
+      <div id="viewport">
+        <div class="header-row" id="headerRow" role="row">
+          <button class="col col-uid" data-key="internal_uid" type="button">ID</button>
+          <button class="col col-name" data-key="project_name" type="button">Project</button>
+          <button class="col col-company" data-key="company_id" type="button">Company</button>
+          <button class="col col-status" data-key="project_status" type="button">Status</button>
+          <button class="col col-type" data-key="automation_type" type="button">Automation Type</button>
+          <button class="col col-robots" data-key="robots_deployed" type="button">Robots</button>
+          <button class="col col-budget" data-key="budget_usd" type="button">Budget</button>
+          <button class="col col-savings" data-key="annual_savings_usd" type="button">Savings</button>
+          <button class="col col-roi" data-key="roi_percent" type="button">ROI %</button>
+          <button class="col col-hours" data-key="employee_hours_saved" type="button">Hrs Saved</button>
+          <button class="col col-dept" data-key="department" type="button">Department</button>
+          <button class="col col-partner" data-key="implementation_partner" type="button">Partner</button>
+          <button class="col col-country" data-key="country" type="button">Country</button>
+          <button class="col col-industry" data-key="industry" type="button">Industry</button>
+        </div>
+        <div id="spacer" aria-live="off"></div>
+        <div class="empty-state" id="emptyState" hidden>
+          No telemetry records match the current filter criteria.
+        </div>
+      </div>
+      <footer class="footer-bar">
+        <span id="footerLeft">0 rows in view</span>
+        <span id="footerRight">tick #0</span>
+      </footer>
+    </section>
+  </main>
+
+  <div id="analyticsOverlay" class="empty-state" style="display: none; background: rgba(10,12,16,0.98); z-index: 100; position: fixed; inset: 0;">
+    <button id="closeAnalyticsBtn" style="position: absolute; top: 16px; right: 24px;">Close Analytics</button>
+    <div style="width: 80%; height: 80%; max-width: 900px; max-height: 500px;">
+      <canvas id="bountyChart"></canvas>
+    </div>
+  </div>
+
+  <aside id="debugOverlay" aria-label="Debug performance overlay">
+    <div>DOM nodes: <b id="debugDomNodes">0</b></div>
+    <div>Row pool: <b id="debugRowPool">0</b></div>
+  </aside>
+
+  <script src="./dataStream.js"></script>
+  <script src="./stateEngine.js"></script>
+  <script src="./virtualGrid.js"></script>
+  <script src="./app.js"></script>
+</body>
+</html>
